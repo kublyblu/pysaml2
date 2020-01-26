@@ -8,6 +8,7 @@ import hashlib
 import itertools
 import logging
 import os
+import uuid
 import six
 
 from time import mktime
@@ -786,8 +787,7 @@ class CryptoBackendXmlSec1(CryptoBackend):
             self.xmlsec,
             '--decrypt',
             '--privkey-pem', key_file,
-            '--id-attr:{id_attr}'.format(id_attr=id_attr),
-            ENC_KEY_CLASS,
+            '--id-attr:Id', ENC_KEY_CLASS,
         ]
 
         try:
@@ -821,8 +821,7 @@ class CryptoBackendXmlSec1(CryptoBackend):
             self.xmlsec,
             '--sign',
             '--privkey-pem', key_file,
-            '--id-attr:{id_attr_name}'.format(id_attr_name=id_attr),
-            node_name,
+            '--id-attr:ID', node_name,
         ]
 
         if node_id:
@@ -866,8 +865,7 @@ class CryptoBackendXmlSec1(CryptoBackend):
             '--verify',
             '--enabled-reference-uris', 'empty,same-doc',
             '--pubkey-cert-{type}'.format(type=cert_type), cert_file,
-            '--id-attr:{id_attr_name}'.format(id_attr_name=id_attr),
-            node_name,
+            '--id-attr:ID', node_name,
         ]
 
         if node_id:
@@ -1864,7 +1862,8 @@ def pre_signature_part(ident, public_key=None, identifier=None, digest_alg=None,
 # </EncryptedData>
 
 
-def pre_encryption_part(msg_enc=TRIPLE_DES_CBC, key_enc=RSA_1_5, key_name='my-rsa-key'):
+def pre_encryption_part(msg_enc=TRIPLE_DES_CBC, key_enc=RSA_1_5, key_name='my-rsa-key',
+        encrypted_key_id=None, encrypted_data_id=None):
     """
 
     :param msg_enc:
@@ -1872,10 +1871,12 @@ def pre_encryption_part(msg_enc=TRIPLE_DES_CBC, key_enc=RSA_1_5, key_name='my-rs
     :param key_name:
     :return:
     """
+    ek_id = encrypted_key_id or str(uuid.uuid4())
+    ed_id = encrypted_data_id or str(uuid.uuid4())
     msg_encryption_method = EncryptionMethod(algorithm=msg_enc)
     key_encryption_method = EncryptionMethod(algorithm=key_enc)
     encrypted_key = EncryptedKey(
-            id='EK',
+            id=ek_id,
             encryption_method=key_encryption_method,
             key_info=ds.KeyInfo(
                 key_name=ds.KeyName(text=key_name)),
@@ -1883,7 +1884,7 @@ def pre_encryption_part(msg_enc=TRIPLE_DES_CBC, key_enc=RSA_1_5, key_name='my-rs
                 cipher_value=CipherValue(text='')))
     key_info = ds.KeyInfo(encrypted_key=encrypted_key)
     encrypted_data = EncryptedData(
-        id='ED',
+        id=ed_id,
         type='http://www.w3.org/2001/04/xmlenc#Element',
         encryption_method=msg_encryption_method,
         key_info=key_info,
